@@ -5,6 +5,7 @@ Script to access Sentinel-2 spectral reflectance values by querying GEE servers.
 """
 
 import logging
+from typing import Tuple
 import os
 import sys
 
@@ -40,7 +41,7 @@ def main(project_name: str, aoi_path: str) -> None:
     # convert vector AOI to GEE compliant geometry
     polygon_ee = convert_to_ee_geometry(gdf=gpd.read_file(aoi_path))
 
-
+    query_sentinel2_archive()
 
     return
 
@@ -90,6 +91,21 @@ def convert_to_ee_geometry(gdf: gpd.GeoDataFrame) -> ee.Geometry.Polygon:
 
     return ee.Geometry.Polygon(polygon_2d_coords)
 
+def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str]) -> None:
+    """
+    
+    Query the Sentinel-2 Archive with an AOI and date range.
+
+
+    Parameters
+    ----------
+    aoi : ee.Geometry.Polygon
+        the AOI to query with
+    date_range : Tuple[str, str]
+        a Tuple of the start and end dates, in the format "YYYY-MM-DD"
+    """
+
+    return
 
 if __name__ == "__main__":
     # if called from main, run
