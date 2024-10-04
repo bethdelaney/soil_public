@@ -17,7 +17,7 @@ import json
 
 import matplotlib.pyplot as plt
 
-def main(project_name: str, aoi_path: str) -> None:
+def main(project_name: str, aoi_path: str, start_date: str, end_date: str) -> None:
     """
     
     Parameters
@@ -26,6 +26,10 @@ def main(project_name: str, aoi_path: str) -> None:
         name of the Earth Engine (EE) project to initialise under
     aoi_path : str
         path to the aoi to inspect with
+    start_date : str
+        the start date, in the format "YYYY-MM-DD"
+    end_date : str
+        the end date, in the format "YYYY-MM-DD"
     
     Returns
     -------
@@ -105,10 +109,14 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str
         a Tuple of the start and end dates, in the format "YYYY-MM-DD"
     """
 
+    logger = logging.getLogger(__name__)
+
+
+
     return
 
 if __name__ == "__main__":
     # if called from main, run
     logging.basicConfig(level=logging.INFO, filename=sys.argv[1], filemode="w", format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    main(project_name=sys.argv[2], aoi_path=sys.argv[3])
+    main(project_name=sys.argv[2], aoi_path=sys.argv[3], start_date=sys.argv[4], end_date=sys.argv[5])
