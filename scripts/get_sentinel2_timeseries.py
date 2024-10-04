@@ -4,6 +4,7 @@ Authors: Beth Delaney, Matt Payne
 Script to access Sentinel-2 spectral reflectance values by querying GEE servers.
 """
 
+from datetime import datetime
 import logging
 from typing import Tuple
 import os
@@ -39,6 +40,8 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str) -> No
     # get logger to print stdout and stderr to
     logger = logging.getLogger(__name__)
 
+    check_dates(start_date, end_date)
+
     # initialise EE Python API
     initialise(project_name=project_name)
 
@@ -48,6 +51,37 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str) -> No
     query_sentinel2_archive()
 
     return
+
+def check_dates(start_date: str, end_date: str) -> None:
+    """
+
+    Checks the dates are in the correct format, "YYYY-MM-DD"
+
+    Parameters
+    ----------
+    start_date : str
+        the start date, in the format "YYYY-MM-DD"
+    end_date : str
+        the start date, in the format "YYYY-MM-DD"
+    """
+
+    logger = logging.getLogger(__name__)
+
+    # using strftime to check whether the supplied string is a date in the correct format
+    try:
+        datetime.strptime(start_date, "%Y-%m-%d")
+    except ValueError as e:
+        logger.error(f"incorrect start date format supplied, should be 'YYYY-MM-DD', got: {e}")
+        raise
+
+    try:
+        datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError as e:
+        logger.error(f"incorrect end date format supplied, should be 'YYYY-MM-DD', got: {e}")
+        raise
+
+    return
+
 
 def initialise(project_name: str) -> None:
     """
@@ -110,8 +144,6 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str
     """
 
     logger = logging.getLogger(__name__)
-
-
 
     return
 
