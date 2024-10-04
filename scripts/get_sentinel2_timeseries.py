@@ -48,7 +48,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str) -> No
     # convert vector AOI to GEE compliant geometry
     polygon_ee = convert_to_ee_geometry(gdf=gpd.read_file(aoi_path))
 
-    query_sentinel2_archive()
+    query_sentinel2_archive(aoi=polygon_ee, date_range=(start_date, end_date))
 
     return
 
@@ -145,7 +145,45 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str
 
     logger = logging.getLogger(__name__)
 
+    s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
+        .filterDate(date_range[0], date_range[1]) \
+        .filterBounds(aoi) \
+        .sort("system:time_start") \
+        .getInfo()
+        #.map(convert_dn_to_reflectance)
+    
+    logger.info(s2)
+
     return
+
+def convert_dn_to_reflectance(image: ee.Image) -> float:
+    """
+
+    Uses Sentinel-2 metadata to obtain scale factor to convert digital numbers of the image to actual reflectance.
+
+    Parameters
+    ----------
+    image : ee.Image
+        a Sentinel-2 image to retrieve metadata on
+
+    Returns
+    -------
+    float
+        reflectance values
+
+    Notes
+    -----
+    This function only works when used on non-harmonised Sentinel-2 imagery.
+    This function can be used in conjunction with `map` and an `ImageCollection`.
+    """
+
+    # get a list of scale factors
+    scale_factor = image.get("REFLECTANCE_MULTI_BAND_")
+
+    # apply scaling factor and convert to reflectance
+    reflectance = image.multiply(scale_factor).toFloat()
+
+    return reflectance
 
 if __name__ == "__main__":
     # if called from main, run
