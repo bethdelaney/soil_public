@@ -40,6 +40,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str) -> No
     # get logger to print stdout and stderr to
     logger = logging.getLogger(__name__)
 
+    # check the start and end dates format are correct
     check_dates(start_date, end_date)
 
     # initialise EE Python API
@@ -48,6 +49,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str) -> No
     # convert vector AOI to GEE compliant geometry
     polygon_ee = convert_to_ee_geometry(gdf=gpd.read_file(aoi_path))
 
+    # query the S2 Archive
     query_sentinel2_archive(aoi=polygon_ee, date_range=(start_date, end_date))
 
     return
@@ -122,7 +124,7 @@ def convert_to_ee_geometry(gdf: gpd.GeoDataFrame) -> ee.Geometry.Polygon:
     polygon_geojson = polygon_geometry.__geo_interface__
 
     
-    # Extract 2D coordinates by stripping the third dimension (altitude)
+    # extract 2D coordinates by stripping the third dimension (altitude)
     polygon_2d_coords = [
         [(x, y) for x, y, _ in ring] for ring in polygon_geojson['coordinates']
     ]
@@ -149,8 +151,6 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str
         .filterDate(date_range[0], date_range[1]) \
         .filterBounds(aoi) \
         .sort("system:time_start") \
-        .getInfo()
-        #.map(convert_dn_to_reflectance)
     
     logger.info(s2)
 
