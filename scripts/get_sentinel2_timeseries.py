@@ -6,19 +6,21 @@ Script to access Sentinel-2 spectral reflectance values by querying GEE servers.
 
 from datetime import datetime
 import logging
-from typing import Tuple
-import os
+from typing import Tuple, Optional
 import sys
 
 import ee
 import folium
+import geemap
 import geojson
 import geopandas as gpd
 import json
-
 import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
 
-def main(project_name: str, aoi_path: str, start_date: str, end_date: str) -> None:
+
+def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_png_path: Optional[str]=None) -> None:
     """
     
     Parameters
@@ -31,6 +33,8 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str) -> No
         the start date, in the format "YYYY-MM-DD"
     end_date : str
         the end date, in the format "YYYY-MM-DD"
+    out_png_path : str, optional, by default None
+        if supplied, the path to save an image as png for visualisation
     
     Returns
     -------
@@ -50,7 +54,11 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str) -> No
     polygon_ee = convert_to_ee_geometry(gdf=gpd.read_file(aoi_path))
 
     # query the S2 Archive
-    query_sentinel2_archive(aoi=polygon_ee, date_range=(start_date, end_date))
+    s2 = query_sentinel2_archive(aoi=polygon_ee, date_range=(start_date, end_date))
+
+    # if this argument is passed, then save an NDVI image as png
+    if out_png_path:
+        save_ndvi_thumbnail(s2.first(), out_png_path)
 
     return
 
@@ -131,7 +139,7 @@ def convert_to_ee_geometry(gdf: gpd.GeoDataFrame) -> ee.Geometry.Polygon:
 
     return ee.Geometry.Polygon(polygon_2d_coords)
 
-def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str]) -> None:
+def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str]) -> ee.imagecollection:
     """
     
     Query the Sentinel-2 Archive with an AOI and date range.
@@ -143,18 +151,32 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str
         the AOI to query with
     date_range : Tuple[str, str]
         a Tuple of the start and end dates, in the format "YYYY-MM-DD"
+    
+    Returns
+    -------
+    ee.ImageCollection
+        ImageCollection of S2 images
     """
 
     logger = logging.getLogger(__name__)
 
-    s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
-        .filterDate(date_range[0], date_range[1]) \
-        .filterBounds(aoi) \
-        .sort("system:time_start") \
-    
-    logger.info(s2)
+    logger.info(date_range[0])
+    logger.info(date_range[1])
 
-    return
+    s2 = (
+        ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+        # .filterDate(date_range[0], date_range[1]) # for some reason does not like how I am passing the dates
+        .filterDate("2019-01-01", "2019-12-31") 
+        .filterBounds(aoi)
+        .sort("system:time_start")
+        # .map(lambda image: image.clip(aoi))
+        .select(["B4", "B8", "B11", "B12"])
+        .map(compute_indices)
+        )
+    
+    # apply NDVI QC
+
+    return s2
 
 def convert_dn_to_reflectance(image: ee.Image) -> float:
     """
@@ -185,8 +207,71 @@ def convert_dn_to_reflectance(image: ee.Image) -> float:
 
     return reflectance
 
+def save_ndvi_thumbnail(image: ee.Image, out_path: str) -> None:
+    """
+
+    Saves an image as a PNG, useful for debugging.
+
+    Parameters
+    ----------
+    image : ee.Image
+        an earth engine image.
+    out_path : str
+        the path to write the png to.
+    """
+
+    logger = logging.getLogger(__name__)
+
+    image = image.select("NDVI")
+
+    vis_params = {
+        "max": 1,
+        "min": 0,
+        "palette": ["white", "green"]
+    }
+
+    # save the thumbnail
+    geemap.get_image_thumbnail(image,
+                               out_img=out_path,
+                               vis_params=vis_params,
+                               format="png")
+
+    # # get the url of the image from the server
+    # url = image.getThumbUrl(vis_params)
+    # array = np.array(Image.open(url))
+    # plt.imshow(array)
+    # plt.title("NDVI")
+    # plt.show()
+    # plt.imsave(out_path, array, dpi=900)
+
+    return
+
+def compute_indices(image: ee.Image) -> ee.Image:
+    """
+    Computes Normalised Difference Vegetation Index (NDVI) and Normalised Burn Ratio (NBR) indices on GEE images.
+
+    Parameters
+    ----------
+    image : ee.Image
+        Image to compute indices upon
+
+    Returns
+    -------
+    ee.Image
+        Image with indices appended
+    """
+
+    ndvi = image.normalizedDifference(["B8", "B4"]).rename("NDVI")
+    nbr = image.normalizedDifference(["B12", "B11"]).rename("NBR")
+
+    return image.addBands(ndvi).addBands(nbr)
+
 if __name__ == "__main__":
     # if called from main, run
     logging.basicConfig(level=logging.INFO, filename=sys.argv[1], filemode="w", format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    main(project_name=sys.argv[2], aoi_path=sys.argv[3], start_date=sys.argv[4], end_date=sys.argv[5])
+    main(project_name=sys.argv[2],
+         aoi_path=sys.argv[3],
+         start_date=sys.argv[4],
+         end_date=sys.argv[5],
+         out_png_path=sys.argv[6])
