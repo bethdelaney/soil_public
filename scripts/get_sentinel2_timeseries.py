@@ -54,7 +54,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_p
     polygon_ee = convert_to_ee_geometry(gdf=gpd.read_file(aoi_path))
 
     # query the S2 Archive
-    s2 = query_sentinel2_archive(aoi=polygon_ee, date_range=(start_date, end_date))
+    s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
 
     # if this argument is passed, then save an NDVI image as png
     if out_png_path:
@@ -139,7 +139,7 @@ def convert_to_ee_geometry(gdf: gpd.GeoDataFrame) -> ee.Geometry.Polygon:
 
     return ee.Geometry.Polygon(polygon_2d_coords)
 
-def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str]) -> ee.imagecollection:
+def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date: str) -> ee.imagecollection:
     """
     
     Query the Sentinel-2 Archive with an AOI and date range.
@@ -149,8 +149,10 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str
     ----------
     aoi : ee.Geometry.Polygon
         the AOI to query with
-    date_range : Tuple[str, str]
-        a Tuple of the start and end dates, in the format "YYYY-MM-DD"
+    start_date: str
+        the start date, in the format "YYYY-MM-DD"
+    end_date : str
+        the end date, in the format "YYYY-MM-DD"
     
     Returns
     -------
@@ -160,13 +162,12 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, date_range: Tuple[str, str
 
     logger = logging.getLogger(__name__)
 
-    logger.info(date_range[0])
-    logger.info(date_range[1])
+    logger.info(start_date)
+    logger.info(end_date)
 
     s2 = (
         ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-        # .filterDate(date_range[0], date_range[1]) # for some reason does not like how I am passing the dates
-        .filterDate("2019-01-01", "2019-12-31") 
+        .filterDate(start_date, end_date) # for some reason does not like how I am passing the dates
         .filterBounds(aoi)
         .sort("system:time_start")
         # .map(lambda image: image.clip(aoi))
