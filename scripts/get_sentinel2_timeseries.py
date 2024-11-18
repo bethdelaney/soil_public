@@ -249,7 +249,11 @@ def save_ndvi_thumbnail(image: ee.Image, out_path: str) -> None:
 
 def compute_indices(image: ee.Image) -> ee.Image:
     """
-    Computes Normalised Difference Vegetation Index (NDVI) and Normalised Burn Ratio (NBR) indices on GEE images.
+    Computes the following indices on `image` and adds the indices back to `image`:
+      - Normalised Difference Vegetation Index (NDVI)
+      - Normalised Burn Ratio (NBR)
+      - Normalised Difference Water Index (NDWI)
+      - Soil Adjusted Vegetation Index (SAVI)
 
     Parameters
     ----------
@@ -264,8 +268,17 @@ def compute_indices(image: ee.Image) -> ee.Image:
 
     ndvi = image.normalizedDifference(["B8", "B4"]).rename("NDVI")
     nbr = image.normalizedDifference(["B12", "B11"]).rename("NBR")
+    ndwi = image.normalizedDifference(["B3", "B8"]).rename("NDWI")
+    # as SAVI is not a normalised Difference index, we use the expression function instead
+    savi = image.expression(
+        "(1 + L) * (NIR - RED) / (NIR + RED + L)", {
+            "NIR": image.select("B8"),
+            "RED": image.select("B4"),
+            "L": 0.5
+        }
+    ).rename("SAVI")
 
-    return image.addBands(ndvi).addBands(nbr)
+    return image.addBands(ndvi).addBands(nbr).addBands(ndwi).addBands(savi)
 
 if __name__ == "__main__":
     # if called from main, run
