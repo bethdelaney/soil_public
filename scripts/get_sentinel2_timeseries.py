@@ -18,6 +18,7 @@ import geopandas as gpd
 import json
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from PIL import Image
 
 
@@ -35,7 +36,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     end_date : str
         the end date, in the format "YYYY-MM-DD"
     out_directory : str, optional, by default None
-        if supplied, the path of the directory to save images as png for visualisation
+        if supplied, the path of the directory to save images and csvs
     
     Returns
     -------
@@ -57,11 +58,30 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     # query the S2 Archive
     s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
 
-    # if this argument is passed, then save an NDVI image as png
+    # if this argument is passed, then save indices of image as png
     if out_directory and s2 is not None:
         save_index_thumbnails(s2.first(), out_directory)
+        # write csv of index values over time, from the AOI centroid.
+        extract_index_timeseries(s2, polygon_ee, out_directory)
+
 
     return
+
+def extract_index_timeseries(image_collection, aoi, out_directory) -> None:
+    """TODO docstrings"""
+
+    # get just the centroid for now
+    centroid = aoi.centroid()
+
+    # get the values at the pixel overlapped by the centroid for each Image in the ImageCollection
+    sampled_values = image_collection.getRegion(centroid, scale=10).getInfo()
+
+    # convert sampled_values to a DataFrame for easier access
+    df = pd.DataFrame(sampled_values[1:], columns=sampled_values[0])
+    # convert ms time to an actual date
+    df["datetime"] = pd.to_datetime(df["time"], unit="ms")
+    df.to_csv(os.path.join(out_directory, "indices_values.csv"), index=False)
+
 
 def check_dates(start_date: str, end_date: str) -> None:
     """
@@ -175,7 +195,7 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         .filterDate(start_date, end_date)
         .filterBounds(aoi)
         .sort("system:time_start")
-        # .map(lambda image: image.clip(aoi))
+        .map(lambda image: image.clip(aoi))
         .select(["B3", "B4", "B8", "B11", "B12"])
         .map(compute_indices)
         )
