@@ -167,8 +167,8 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
 
     logger = logging.getLogger(__name__)
 
-    logger.info(start_date)
-    logger.info(end_date)
+    logger.info(f"Start Date: {start_date}")
+    logger.info(f"End Date: {end_date}")
 
     s2 = (
         ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
