@@ -240,17 +240,17 @@ def save_index_thumbnails(image: ee.Image, out_path_prefix: str) -> None:
             "palette": ["white", "green"]
         },
         "NDWI": {
-            "max": 1,
+            "max": 0.5,
             "min": -1,
             "palette": ["white", "blue"]
         },
         "NBR": {
-            "max": 1,
+            "max": 0.5,
             "min": -1,
             "palette": ["white", "red"]
         },
         "SAVI": {
-            "max": 1,
+            "max": 0.5,
             "min": -1,
             "palette": ["white", "orange"]
         }
@@ -263,12 +263,21 @@ def save_index_thumbnails(image: ee.Image, out_path_prefix: str) -> None:
         out_path = os.path.join(out_path_prefix, f"{index_name}.png")
 
         # save the thumbnail
-        geemap.get_image_thumbnail(index_image,
-                                out_img=out_path,
-                                vis_params=vis_params,
-                                format="png")
-        
-        logger.info(f"saved {index_name} to {out_path} ")
+        try:
+            geemap.get_image_thumbnail(index_image,
+                                    out_img=out_path,
+                                    vis_params=vis_params,
+                                    format="png")
+            logger.info(f"saved {index_name} to {out_path} ")
+
+        except Exception as e:
+        #except ee.ee_exception.EEException() as e: # did not like except ee.ee_exception.EEException as e as "TypeError: catching classes that do not inherit from BaseException is not allowed"
+            if "Image.select: Parameter 'input' is required" in str(e):
+                logger.warning(f"No images found for {index_name} index. Skipping thumbnail generation.")
+            else:
+                logger.error("Error generating thumbnail:")
+                logger.exception(e)
+            
 
 
     return
