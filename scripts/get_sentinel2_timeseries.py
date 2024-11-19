@@ -58,7 +58,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
 
     # if this argument is passed, then save an NDVI image as png
-    if out_directory:
+    if out_directory and s2 is not None:
         save_index_thumbnails(s2.first(), out_directory)
 
     return
@@ -180,6 +180,11 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         .map(compute_indices)
         )
     
+    # check if an empty ImgCol was returned
+    if s2.size().getInfo() == 0:
+        logger.warning("No images found for given query date and AOI")
+        return None
+    
     # apply NDVI QC
 
     return s2
@@ -268,7 +273,7 @@ def save_index_thumbnails(image: ee.Image, out_path_prefix: str) -> None:
                                     out_img=out_path,
                                     vis_params=vis_params,
                                     format="png")
-            logger.info(f"saved {index_name} to {out_path} ")
+            logger.info(f"saved {index_name} to {out_path}")
 
         except Exception as e:
         #except ee.ee_exception.EEException() as e: # did not like except ee.ee_exception.EEException as e as "TypeError: catching classes that do not inherit from BaseException is not allowed"
