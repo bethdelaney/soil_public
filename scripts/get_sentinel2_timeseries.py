@@ -82,6 +82,8 @@ def extract_index_timeseries(image_collection: ee.imagecollection, aoi: ee.Geome
         absolute path to the out directory to write files to.
     """
 
+    logger = logging.getLogger(__name__)
+
     # get just the centroid for now
     centroid = aoi.centroid()
 
@@ -92,6 +94,8 @@ def extract_index_timeseries(image_collection: ee.imagecollection, aoi: ee.Geome
     df = pd.DataFrame(sampled_values[1:], columns=sampled_values[0])
     # convert ms time to an actual date
     df["datetime"] = pd.to_datetime(df["time"], unit="ms")
+    columns_to_keep = ["Id", "NDVI", "NDWI", "NBR", "SAVI", "datetime"]
+    df = df.filter(columns_to_keep, axis="columns")
     df.to_csv(os.path.join(out_directory, "indices_values.csv"), index=False)
 
     return
