@@ -8,6 +8,7 @@ import logging
 import sys
 from typing import Optional
 
+import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.signal import savgol_filter
@@ -36,6 +37,10 @@ def main(log_path: str, in_csv_path: str, out_directory: str, filter: Optional[s
     # read the csv into a Pandas DataFrame
     df = pd.read_csv(in_csv_path)
 
+    smoothed_df = smooth_timeseries_sg(df)
+
+    logger.info(smoothed_df)
+
     return
 
 def smooth_timeseries_sg(df: pd.DataFrame, window_size: int=9, poly_order: int=2) -> pd.DataFrame:
@@ -58,12 +63,16 @@ def smooth_timeseries_sg(df: pd.DataFrame, window_size: int=9, poly_order: int=2
     pd.DataFrame
         DataFrame with the smoothed time series.
     """
+
+    # get logger
+    logger = logging.getLogger(__name__)
+
     smoothed_df = df.copy()  # Make a copy of the DataFrame to avoid modifying the original
     for idx, row in df.iterrows():  # Iterate through each row (field-metric pair)
         y = row.values  # Extract the values (time series)
         
         # Print original values for debugging
-        print(f"Original {idx} values: {y}")
+        logger.info(f"Original {idx} values: {y}")
         
         # Check if the length of the series is greater than or equal to the window size
         if len(y) >= window_size and np.all(np.isfinite(y)):  # Ensure no NaN values in the data
@@ -71,9 +80,9 @@ def smooth_timeseries_sg(df: pd.DataFrame, window_size: int=9, poly_order: int=2
             smoothed_df.loc[idx] = yhat  # Store the smoothed values
             
             # Print smoothed values for verification
-            print(f"Smoothed {idx} values: {yhat}")
+            logger.info(f"Smoothed {idx} values: {yhat}")
         else:
-            print(f"Skipping smoothing for {idx} because length is less than the window size or contains NaN")
+            logger.error(f"Skipping smoothing for {idx} because length is less than the window size or contains NaN")
             smoothed_df.loc[idx] = y  # If not enough data or contains NaN, leave it unsmoothed
     return smoothed_df
 
