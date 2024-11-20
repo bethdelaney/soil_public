@@ -91,6 +91,7 @@ def extract_index_timeseries(image_collection: ee.imagecollection, aoi: ee.Geome
     # convert ms time to an actual date
     df["datetime"] = pd.to_datetime(df["time"], unit="ms")
     columns_to_keep = ["Id", "NDVI", "NDWI", "NBR", "SAVI", "datetime"]
+    # TODO "Id" is not being retained
     df = df.filter(columns_to_keep, axis="columns")
     df.to_csv(os.path.join(out_directory, "indices_values.csv"), index=False)
 
