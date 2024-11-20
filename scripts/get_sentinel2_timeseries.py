@@ -67,8 +67,20 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
 
     return
 
-def extract_index_timeseries(image_collection, aoi, out_directory) -> None:
-    """TODO docstrings"""
+def extract_index_timeseries(image_collection: ee.imagecollection, aoi: ee.Geometry.Polygon, out_directory: str) -> None:
+    """
+
+    Converts index values for every image in `image_collection`, converts these to a Pandas DataFrame and writes these to CSV.
+
+    Parameters
+    ----------
+    image_collection : ee.imagecollection
+        Sentinel-2 ImageCollection with indices computed.
+    aoi : ee.Geometry.Polygon
+        GEE compliant geometry.
+    out_directory : str
+        absolute path to the out directory to write files to.
+    """
 
     # get just the centroid for now
     centroid = aoi.centroid()
@@ -81,6 +93,8 @@ def extract_index_timeseries(image_collection, aoi, out_directory) -> None:
     # convert ms time to an actual date
     df["datetime"] = pd.to_datetime(df["time"], unit="ms")
     df.to_csv(os.path.join(out_directory, "indices_values.csv"), index=False)
+
+    return
 
 
 def check_dates(start_date: str, end_date: str) -> None:
