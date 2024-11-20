@@ -39,20 +39,20 @@ def main(log_path: str, in_csv_path: str, out_directory: str, filter: Optional[s
 
     smoothed_df = smooth_timeseries_sg(df)
 
-    logger.info(smoothed_df)
-
     return
 
 def smooth_timeseries_sg(df: pd.DataFrame, window_size: int=9, poly_order: int=2) -> pd.DataFrame:
     """
-    Author: Beth Delaney
+    Apply Savitzky-Golay smoothing to each column (except date) in the DataFrame.
 
-    Apply Savitzky-Golay smoothing to all rows (field-metric pair) in the DataFrame.
+    Original Author: Beth Delaney.
+    Amended by Matt Payne to reflect the column-wise nature of the index CSV.
 
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame containing the time series data (rows are field-metric pairs, columns are dates).
+        DataFrame containing the time series data (columns are spectral indices, 
+        rows are timestamps).
     window_size : int, optional
         The size of the window (must be odd)., by default 9.
     poly_order : int, optional
@@ -67,25 +67,33 @@ def smooth_timeseries_sg(df: pd.DataFrame, window_size: int=9, poly_order: int=2
     # get logger
     logger = logging.getLogger(__name__)
 
+    # sort by datetime, just to be sure
+    df.sort_values(by="datetime", ascending=True, inplace=True)
+
     smoothed_df = df.copy()  # Make a copy of the DataFrame to avoid modifying the original
-    for idx, row in df.iterrows():  # Iterate through each row (field-metric pair)
-        y = row.values  # Extract the values (time series)
+
+    # get only the spectral indices columns
+    spectral_cols = df.filter(["NDVI", "SAVI", "NBR", "NDWI"], axis="columns")
+
+    # for each column, do:
+    for col in spectral_cols:
         
-        # Print original values for debugging
-        logger.info(f"Original {idx} values: {y}")
+        # get the values as a numpy array
+        y = df[col].values
+
+        logger.info(f"Original {col} values: {y}")
         
         # Check if the length of the series is greater than or equal to the window size
         if len(y) >= window_size and np.all(np.isfinite(y)):  # Ensure no NaN values in the data
             yhat = savgol_filter(y, window_size, poly_order)
-            smoothed_df.loc[idx] = yhat  # Store the smoothed values
+            smoothed_df[col] = yhat  # Store the smoothed values
             
             # Print smoothed values for verification
-            logger.info(f"Smoothed {idx} values: {yhat}")
+            logger.info(f"Smoothed {col} values: {yhat}")
         else:
-            logger.error(f"Skipping smoothing for {idx} because length is less than the window size or contains NaN")
-            smoothed_df.loc[idx] = y  # If not enough data or contains NaN, leave it unsmoothed
+            logger.error(f"Skipping smoothing for {col} because length is less than the window size or contains NaN")
+            # If not enough data or contains NaN, leave it unsmoothed
     return smoothed_df
-
 
 if __name__ == "__main__":
     main(log_path=sys.argv[1],
