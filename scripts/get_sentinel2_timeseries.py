@@ -21,7 +21,6 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-
 def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_directory: Optional[str]=None) -> None:
     """
     
@@ -64,7 +63,6 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
         # write csv of index values over time, from the AOI centroid.
         extract_index_timeseries(s2, polygon_ee, out_directory)
 
-
     return
 
 def extract_index_timeseries(image_collection: ee.imagecollection, aoi: ee.Geometry.Polygon, out_directory: str) -> None:
@@ -81,8 +79,6 @@ def extract_index_timeseries(image_collection: ee.imagecollection, aoi: ee.Geome
     out_directory : str
         absolute path to the out directory to write files to.
     """
-
-    logger = logging.getLogger(__name__)
 
     # get just the centroid for now
     centroid = aoi.centroid()
@@ -223,7 +219,7 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         logger.warning("No images found for given query date and AOI")
         return None
     
-    # apply NDVI QC
+    # TODO apply NDVI QC
 
     return s2
 
