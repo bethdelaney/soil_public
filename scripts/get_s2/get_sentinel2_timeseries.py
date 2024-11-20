@@ -204,6 +204,8 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
     logger.info(f"Start Date: {start_date}")
     logger.info(f"End Date: {end_date}")
 
+    # TODO Remove duplicate S2s
+
     s2 = (
         ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
         .filterDate(start_date, end_date)
