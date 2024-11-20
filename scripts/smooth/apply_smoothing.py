@@ -33,6 +33,49 @@ def main(log_path: str, in_csv_path: str, out_directory: str, filter: Optional[s
     # get logger
     logger = logging.getLogger(__name__)
 
+    # read the csv into a Pandas DataFrame
+    df = pd.read_csv(in_csv_path)
+
+    return
+
+def smooth_timeseries_sg(df: pd.DataFrame, window_size: int=9, poly_order: int=2) -> pd.DataFrame:
+    """
+    Author: Beth Delaney
+
+    Apply Savitzky-Golay smoothing to all rows (field-metric pair) in the DataFrame.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the time series data (rows are field-metric pairs, columns are dates).
+    window_size : int, optional
+        The size of the window (must be odd)., by default 9.
+    poly_order : int, optional
+        The order of the polynomial to fit, by default 2.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with the smoothed time series.
+    """
+    smoothed_df = df.copy()  # Make a copy of the DataFrame to avoid modifying the original
+    for idx, row in df.iterrows():  # Iterate through each row (field-metric pair)
+        y = row.values  # Extract the values (time series)
+        
+        # Print original values for debugging
+        print(f"Original {idx} values: {y}")
+        
+        # Check if the length of the series is greater than or equal to the window size
+        if len(y) >= window_size and np.all(np.isfinite(y)):  # Ensure no NaN values in the data
+            yhat = savgol_filter(y, window_size, poly_order)
+            smoothed_df.loc[idx] = yhat  # Store the smoothed values
+            
+            # Print smoothed values for verification
+            print(f"Smoothed {idx} values: {yhat}")
+        else:
+            print(f"Skipping smoothing for {idx} because length is less than the window size or contains NaN")
+            smoothed_df.loc[idx] = y  # If not enough data or contains NaN, leave it unsmoothed
+    return smoothed_df
 
 
 if __name__ == "__main__":
