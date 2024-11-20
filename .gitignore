@@ -1,4 +1,5 @@
-# ignore txt files in subfolder
-/*/*.txt
-# ignore logs in subfolder
-/*/*.log
+# ignore txt files
+*.txt
+
+# ignore logs
+*.log
