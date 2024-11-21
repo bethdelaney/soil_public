@@ -80,23 +80,71 @@ def extract_index_timeseries(image_collection: ee.imagecollection, aoi: ee.Geome
         absolute path to the out directory to write files to.
     """
 
-    # get just the centroid for now
-    centroid = aoi.centroid()
+    logger = logging.getLogger(__name__)
 
-    # get the values at the pixel overlapped by the centroid for each Image in the ImageCollection
-    sampled_values = image_collection.getRegion(centroid, scale=10).getInfo()
+    # get the mean values per image of the pixels overlapped by the AOI for each Image in the ImageCollection
+    reduced_collection = image_collection.map(lambda image: reduce_image_mean(image, aoi))
 
-    # convert sampled_values to a DataFrame for easier access
-    df = pd.DataFrame(sampled_values[1:], columns=sampled_values[0])
-    # convert ms time to an actual date
-    df["datetime"] = pd.to_datetime(df["time"], unit="ms")
-    columns_to_keep = ["Id", "NDVI", "NDWI", "NBR", "SAVI", "datetime"]
-    # TODO "Id" is not being retained
-    df = df.filter(columns_to_keep, axis="columns")
+    # execute the computation on GEE servers
+    sampled_values = reduced_collection.getInfo()["features"]
+
+    # convert the dictionary into a list of dictionaries to use with Pandas
+    data = []
+    for feature in sampled_values:
+        # properties is a dictionary containing the spectral mean values
+        properties = feature["properties"]
+        # convert ms time to an actual date
+        properties["datetime"] = pd.to_datetime(properties["time"], unit="ms")
+        # add to the list
+        data.append(properties)
+
+    # convert the list of dictionaries to a DataFrame for easier access
+    df = pd.DataFrame(data)
+    df.drop(["time"], axis=1, inplace=True) # drop time in ms
+
+    logger.info(df)
+    # TODO "Id" should be retained
     df.to_csv(os.path.join(out_directory, "indices_values.csv"), index=False)
 
     return
 
+def reduce_image_mean(image: ee.image, aoi: ee.Geometry.Polygon) -> ee.dictionary:
+    """
+
+    Calculate the mean for each band in `image` of the pixels within the geometry by reducing the image.
+
+    Parameters
+    ----------
+    image : ee.image
+        The image to reduce on.
+    aoi : ee.Geometry.Polygon
+        the geometry for the region to reduce within.
+
+    Returns
+    -------
+    ee.Feature
+        An GEE feature containing the mean value of all the pixels within a geometry.
+    """
+
+    reduced_values = image.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=aoi,
+        scale=10,
+        crs="EPSG:32632",
+        bestEffort=True # if too many pixels at scale arg, then try again with coarser scale
+    )
+
+    # get tile id
+    tile_id = image.get("MGRS_TILE")
+
+    # get the date and time in ms
+    reduced_values = reduced_values.set("time", image.get("system:time_start"))
+
+    # assign tile_id
+    reduced_values = reduced_values.set("tile_id", tile_id)
+
+    # convert from dictonary to ee.Feature. The parent code is `map`, which expects an `ee.Image` or `ee.Feature` to be returned.
+    return ee.Feature(None, reduced_values)
 
 def check_dates(start_date: str, end_date: str) -> None:
     """
@@ -287,12 +335,12 @@ def save_index_thumbnails(image: ee.Image, out_path_prefix: str) -> None:
             "palette": ["white", "blue"]
         },
         "NBR": {
-            "max": 0.5,
+            "max": 1,
             "min": -1,
             "palette": ["white", "red"]
         },
         "SAVI": {
-            "max": 0.5,
+            "max": 1,
             "min": -1,
             "palette": ["white", "orange"]
         }
