@@ -17,9 +17,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# local import
-from hollstein import hollstein_S2
-
 def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_directory: Optional[str]=None) -> None:
     """
     
@@ -55,10 +52,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
 
     # query the S2 Archive
     s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
-
-    logger.info("see if the QC masking worked:")
-    logger.info(s2.getInfo())
-
+    
     # if this argument is passed, then save indices of image as png
     if out_directory and s2 is not None:
         save_index_thumbnails(s2.first(), out_directory)
@@ -263,7 +257,6 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         .filterBounds(aoi)
         .sort("system:time_start")
         .map(lambda image: image.clip(aoi))
-        .select(["B3", "B4", "B8", "B11", "B12"])
         .map(compute_indices)
         )
     
@@ -272,67 +265,9 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         logger.warning("No images found for given query date and AOI")
         return None
     
-    # apply NDVI QC
-    mask = s2.select("NDVI").mosaic().mask()
-    processed_s2 = s2.map(lambda img: preprocess_image(img, mask))
+    # TODO apply QC using "COPERNICUS/S2_CLOUD_PROBABILITY"
 
-    return processed_s2
-
-def qc_indices(img):
-    """
-    Applies quality control to Sentinel-2 spectral indices.
-
-    Args:
-      img: An ee.Image containing the calculated spectral indices 
-           (NDVI, NBR, NDWI, SAVI).
-
-    Returns:
-      An ee.Image with added bands for weights and QC masks.
-    """
-
-    # Apply Hollstein mask for each QC condition
-    qc_snow = hollstein_S2(img, ['snow']).select('snow').Not().unmask(0)
-    qc_cirrus = hollstein_S2(img, ['cirrus']).select('cirrus').Not().unmask(0)
-    qc_cloud = hollstein_S2(img, ['cloud']).select('cloud').Not().unmask(0)
-    qc_shadow = hollstein_S2(img, ['shadow']).select('shadow').Not().unmask(0)
-
-    # Define weights based on QC masks
-    w = img.select(1).mask()  # You might need to adjust this depending on your image
-    q_0 = (qc_cloud.And(qc_shadow).And(qc_snow)).Not()
-    q_1 = qc_cirrus.Not()
-
-    w = w.where(q_1, 0.5).where(q_0, 0.05)
-
-    # Add QC bands and weights to the original image
-    return img.addBands([w, qc_snow, qc_cirrus, qc_cloud, qc_shadow]).rename(
-        ['NDVI', 'NBR', 'NDWI', 'SAVI', 'w', 'qc_snow', 'qc_cirrus', 'qc_cloud', 'qc_shadow']
-    ).copyProperties(img, img.propertyNames())
-
-def preprocess_image(img: ee.image, mask: ee.image):
-    """
-    Preprocesses a single image in the collection with a mask.
-
-    Parameters
-    ----------
-    img: ee.image
-        an image from an ImageCollection.
-    mask: ee.image
-        an image representing the mask to apply.
-        
-    Returns
-    -------
-    ee.image
-        The preprocessed ee.Image.
-    """
-    logger = logging.getLogger(__name__)
-
-    img = img.unmask(-1.0)
-    img = qc_indices(img)
-    
-    logger.info(type(img))
-
-    return img.updateMask(mask)
-
+    return s2
 
 def convert_dn_to_reflectance(image: ee.Image) -> float:
     """
