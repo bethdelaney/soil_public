@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+# local import
+from hollstein import hollstein_S2
+
 def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_directory: Optional[str]=None) -> None:
     """
     
@@ -260,6 +263,8 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         .select(["B3", "B4", "B8", "B11", "B12"])
         .map(compute_indices)
         )
+    
+    
     
     # check if an empty ImgCol was returned
     if s2.size().getInfo() == 0:
