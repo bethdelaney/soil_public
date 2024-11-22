@@ -12,7 +12,6 @@ from typing import Optional
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.ticker import MaxNLocator
 import pandas as pd
 from scipy.signal import savgol_filter
 
@@ -133,13 +132,13 @@ def plot_comparison(df: pd.DataFrame, smoothed_df: pd.DataFrame, out_directory: 
         plt.figure(figsize=(10, 6))
 
         # scatter plot for 'Raw' values
-        plt.scatter(dates, original_index, label=f"Original {spectral_index}", marker="o", color="blue", s=3) # s controls the size of the markers
-        plt.plot(dates, smoothed_index, label=f"Smoothed {spectral_index}", color="orange")
+        plt.scatter(dates, original_index, label=f"Original Mean {spectral_index}", marker="o", color="blue", s=3) # s controls the size of the markers
+        plt.plot(dates, smoothed_index, label=f"Smoothed Mean {spectral_index}", color="orange")
 
         # adding labels and title
         plt.xlabel("Date")
         plt.ylabel(spectral_index)
-        plt.title(f"Original and Smoothed {spectral_index}")
+        plt.title(f"Original and Smoothed Mean {spectral_index}")
         plt.legend()
 
         # cleanup xaxis for dates
@@ -151,7 +150,7 @@ def plot_comparison(df: pd.DataFrame, smoothed_df: pd.DataFrame, out_directory: 
 
         # show the plot
         plt.tight_layout()
-        plt.savefig(os.path.join(out_directory, f"{spectral_index}.png"))
+        plt.savefig(os.path.join(out_directory, f"{spectral_index}_graph.png"))
         plt.show()
 
     return
