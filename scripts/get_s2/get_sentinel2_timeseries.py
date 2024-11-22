@@ -11,15 +11,11 @@ import sys
 from typing import Optional
 
 import ee
-import folium
 import geemap
-import geojson
 import geopandas as gpd
-import json
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from PIL import Image
 
 def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_directory: Optional[str]=None) -> None:
     """
@@ -60,7 +56,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     # if this argument is passed, then save indices of image as png
     if out_directory and s2 is not None:
         save_index_thumbnails(s2.first(), out_directory)
-        # write csv of index values over time, from the AOI centroid.
+        # get mean index values over time, from the AOI centroid and write to CSV
         extract_index_timeseries(s2, polygon_ee, out_directory)
 
     return
