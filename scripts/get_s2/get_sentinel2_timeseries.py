@@ -265,16 +265,17 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         logger.warning("No images found for given query date and AOI")
         return None
     
-    s2_cloudless = (
+    # apply QC using "COPERNICUS/S2_CLOUD_PROBABILITY" as Hollstein req. L1C band B10
+    s2_cloud_proba_col = (
         ee.ImageCollection("COPERNICUS/S2_CLOUD_PROBABILITY")
         .filterBounds(aoi)
         .filterDate(start_date, end_date)
+        .sort("system:time_start")
+        .map(lambda image: image.clip(aoi))
+        )
+    s2_with_cloud_proba = s2.map(lambda image: join_cloud_proba(image, s2_cloud_proba_col))
 
-    )
-
-    # TODO apply QC using "COPERNICUS/S2_CLOUD_PROBABILITY"
-
-    return s2
+    return s2_with_cloud_proba
 
 def convert_dn_to_reflectance(image: ee.Image) -> float:
     """
@@ -406,6 +407,32 @@ def compute_indices(image: ee.Image) -> ee.Image:
     ).rename("SAVI")
 
     return image.addBands(ndvi).addBands(nbr).addBands(ndwi).addBands(savi)
+
+def join_cloud_proba(img: ee.image, cloud_proba_col: ee.image_collection):
+    """
+    Joins a Sentinel-2 image with its corresponding cloud probability mask.    
+
+    Parameters
+    ----------
+    img : ee.image
+        The image to compute the join on
+    cloud_prob_col : ee.image_collection
+        The S2_CLOUD_PROBABILITY ImageCollection to match.
+    
+    Returns
+    -------
+    img: ee.image
+        The image with the cloud probability score per pixel added as a band
+        
+    Notes
+    -----
+    This function is used on an ImageCollection via `imagecollection.map(lambda img: join_cloud_proba(img, cloud_prob_col))
+    """
+
+    # get the cloud probability image that matches `img`
+    cloud_proba_img = ee.Image(cloud_proba_col.filter(ee.Filter.eq("system:index", img.get("system:index"))).first())
+    
+    return img.addBands(cloud_proba_img.rename("cloud_probability"))
 
 if __name__ == "__main__":
     # if called from main, run
