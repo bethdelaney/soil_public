@@ -12,3 +12,5 @@ Then run the script as follows, assuming you cloned the repo into home (Linux sp
 ```{bash}
 cd "$HOME/soil_public/scripts/get_s2" && ./main.sh "/path/to/logs_dir" "ee-project-name" "/path/to/AOI" "YYYY-MM-DD" "YYYY-MM-DD" "/path/to/out_dir"
 ```
+
+The `main.sh` file prepares the directories, invokes a conda environment and passes the arguments from main to `python`.
