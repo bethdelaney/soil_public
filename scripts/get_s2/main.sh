@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # activate environment with the required libraries
-source /home/mattpayne/miniconda3/etc/profile.d/conda.sh
+source $HOME/miniconda3/etc/profile.d/conda.sh
 conda activate earthengine
 
 # error handling
