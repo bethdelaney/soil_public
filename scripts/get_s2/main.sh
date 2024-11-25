@@ -18,8 +18,8 @@ OUT_DIRECTORY="$6"
 ##########################################
 
 # make parent dir
-mkdir -p "$OUT_DIRECTORY"
+mkdir -p "$OUT_DIRECTORY" "$LOGS_DIR"
 
 LOG_PATH="$LOGS_DIR/ee_s2.log"
 
-python $HOME/forked/soil_public/scripts/get_s2/get_sentinel2_timeseries.py "$LOG_PATH" "$EE_PROJECT_NAME" "$AOI_PATH" "$START_DATE" "$END_DATE" "$OUT_DIRECTORY"
+python $HOME/soil_public/scripts/get_s2/get_sentinel2_timeseries.py "$LOG_PATH" "$EE_PROJECT_NAME" "$AOI_PATH" "$START_DATE" "$END_DATE" "$OUT_DIRECTORY"
