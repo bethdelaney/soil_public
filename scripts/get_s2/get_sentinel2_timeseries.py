@@ -253,8 +253,8 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
 
     s2 = (
         ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-        .filterDate(start_date, end_date)
         .filterBounds(aoi)
+        .filterDate(start_date, end_date)
         .sort("system:time_start")
         .map(lambda image: image.clip(aoi))
         .map(compute_indices)
@@ -265,6 +265,13 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         logger.warning("No images found for given query date and AOI")
         return None
     
+    s2_cloudless = (
+        ee.ImageCollection("COPERNICUS/S2_CLOUD_PROBABILITY")
+        .filterBounds(aoi)
+        .filterDate(start_date, end_date)
+
+    )
+
     # TODO apply QC using "COPERNICUS/S2_CLOUD_PROBABILITY"
 
     return s2
