@@ -8,7 +8,9 @@ You can set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable as the pat
 EXPORT GOOGLE_APPLICATION_CREDENTIALS="path_to_service_account_key.json"
 ```
 
-Then run the script as follows, assuming you cloned the repo into home (Linux specific terminology).
+## Running the Script
+
+Run the script as follows, assuming you cloned the repo into home (Linux specific terminology).
 ```{bash}
 cd "$HOME/soil_public/scripts/get_s2" && ./main.sh "/path/to/logs_dir" "ee-project-name" "/path/to/AOI" "YYYY-MM-DD" "YYYY-MM-DD" "/path/to/out_dir"
 ```
