@@ -408,7 +408,7 @@ def compute_indices(image: ee.Image) -> ee.Image:
 
     return image.addBands(ndvi).addBands(nbr).addBands(ndwi).addBands(savi)
 
-def join_cloud_proba(img: ee.image, cloud_proba_col: ee.image_collection):
+def join_cloud_proba(img: ee.image, cloud_proba_col: ee.imagecollection):
     """
     Joins a Sentinel-2 image with its corresponding cloud probability mask.    
 
