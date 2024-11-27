@@ -17,6 +17,9 @@ tar -xf "$out_archive" -C "$HOME"
 echo "running gcloud-sdk installer, log out and back into the instance for the changes to take effect"
 $HOME/google-cloud-sdk/install.sh
 
+###### `gcloud init` IS REQUIRED AND HAS A FEW INTERACTIVE STEPS TO CONFIGURE PROGRAMMATIC ACCESS
+###### THIS IS A PROBLEM/HEADACHE TO SOLVE LATER...
+
 ###### NON INTERACTIVE DOESNT WORK YET :(
 
 # run the installer in non-interactive mode ## HAVENT GOTTEN THIS WORKING YET # NEED TO DO SOMETHING WITH THE BASHRC TO ENABLE CLI
