@@ -53,9 +53,11 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     # query the S2 Archive
     s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
     
-    # if this argument is passed, then save indices of image as png
+    # if this argument is passed, then save indices and true colour image as png
     if out_directory and s2 is not None:
-        save_index_thumbnails(s2.first(), out_directory)
+        save_image_thumbnails(s2.first(), out_directory)
+
+        sys.exit(1)
         # get mean index values over time, from the AOI centroid and write to CSV
         extract_index_timeseries(s2, polygon_ee, out_directory)
 
@@ -256,7 +258,8 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         .filterBounds(aoi)
         .filterDate(start_date, end_date)
         .sort("system:time_start")
-        .map(lambda image: image.clip(aoi))
+        .filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 20) \
+        # .map(lambda image: image.clip(aoi))
         .map(compute_indices)
         )
     
@@ -306,20 +309,20 @@ def convert_dn_to_reflectance(image: ee.Image) -> float:
 
     return reflectance
 
-def save_index_thumbnails(image: ee.Image, out_path_prefix: str) -> None:
+def save_image_thumbnails(image: ee.Image, out_path_prefix: str) -> None:
     """
 
-    Saves thumbnails for multiple indices as PNGs:
+    Saves thumbnails for multiple indices and RGB as PNGs:
         - Normalised Difference Vegetation Index (NDVI)
         - Normalised Burn Ratio (NBR)
         - Normalised Difference Water Index (NDWI)
         - Soil Adjusted Vegetation Index (SAVI)
-
+        - True Colour (RGB)
 
     Parameters
     ----------
     image : ee.Image
-        an earth engine image, containing the indices.
+        an earth engine image, containing the precomputed indices and S2 RGB bands.
     out_path : str
         the path of the directory to write to.
     """
@@ -346,32 +349,41 @@ def save_index_thumbnails(image: ee.Image, out_path_prefix: str) -> None:
             "max": 1,
             "min": -1,
             "palette": ["white", "orange"]
+        },
+        "RGB": {
+            "max": 3000,
+            "min": 0,
+            "bands": ["B4", "B3", "B2"],
+            "gamma": 1.4
         }
     }
 
-    for index_name, vis_params in vis_params_dict.items():
-        # get index image
-        index_image = image.select(index_name)
-        # construct out_path
-        out_path = os.path.join(out_path_prefix, f"{index_name}.png")
-
-        # save the thumbnail
+    for image_name, vis_params in vis_params_dict.items():
+        # wrap in try except block, this is where problems will occur as `geemap` will be calling EE servers
         try:
-            geemap.get_image_thumbnail(index_image,
-                                    out_img=out_path,
-                                    vis_params=vis_params,
-                                    format="png")
-            logger.info(f"saved {index_name} to {out_path}")
+            # logic to account for RGB
+            if image_name == "RGB":
+                image_to_save = image.select(vis_params["bands"])
+            else:
+                image_to_save = image.select(image_name)
+
+            # construct out_path
+            out_path = os.path.join(out_path_prefix, f"{image_name}.png")
+
+            # save the thumbnail
+            geemap.get_image_thumbnail(image_to_save,
+                                       out_img=out_path,
+                                       vis_params=vis_params,
+                                       format="png")
+            logger.info(f"saved {image_name} to {out_path}")
 
         except Exception as e:
         #except ee.ee_exception.EEException() as e: # did not like except ee.ee_exception.EEException as e as "TypeError: catching classes that do not inherit from BaseException is not allowed"
             if "Image.select: Parameter 'input' is required" in str(e):
-                logger.warning(f"No images found for {index_name} index. Skipping thumbnail generation.")
+                logger.warning(f"No images found for {image_name}. Skipping thumbnail generation.")
             else:
                 logger.error("Error generating thumbnail:")
                 logger.exception(e)
-            
-
 
     return
 
