@@ -57,7 +57,6 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     if out_directory and s2 is not None:
         save_image_thumbnails(s2.first(), out_directory)
 
-        sys.exit(1)
         # get mean index values over time, from the AOI centroid and write to CSV
         extract_index_timeseries(s2, polygon_ee, out_directory)
 
@@ -259,7 +258,7 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         .filterDate(start_date, end_date)
         .sort("system:time_start")
         .filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 20) \
-        # .map(lambda image: image.clip(aoi))
+        .map(lambda image: image.clip(aoi))
         .map(compute_indices)
         )
     
@@ -278,7 +277,10 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         )
     s2_with_cloud_proba = s2.map(lambda image: join_cloud_proba(image, s2_cloud_proba_col))
 
-    return s2_with_cloud_proba
+    # apply weights based on cloud probability
+    s2_with_weights = s2_with_cloud_proba.map(calculate_weights)
+
+    return s2_with_weights
 
 def convert_dn_to_reflectance(image: ee.Image) -> float:
     """
@@ -420,7 +422,7 @@ def compute_indices(image: ee.Image) -> ee.Image:
 
     return image.addBands(ndvi).addBands(nbr).addBands(ndwi).addBands(savi)
 
-def join_cloud_proba(img: ee.image, cloud_proba_col: ee.imagecollection):
+def join_cloud_proba(img: ee.image, cloud_proba_col: ee.imagecollection) -> ee.image:
     """
     Joins a Sentinel-2 image with its corresponding cloud probability mask.    
 
@@ -445,6 +447,29 @@ def join_cloud_proba(img: ee.image, cloud_proba_col: ee.imagecollection):
     cloud_proba_img = ee.Image(cloud_proba_col.filter(ee.Filter.eq("system:index", img.get("system:index"))).first())
     
     return img.addBands(cloud_proba_img.rename("cloud_probability"))
+
+def calculate_weights(img: ee.image) -> ee.image:
+    """
+    Calculate per-pixel weight for Whittaker smoothing based on cloud probability score
+
+    Parameters
+    ----------
+    img : ee.image
+        The image with a cloud probability score to calculate the weights from.
+
+    Returns
+    -------
+    ee.image
+        The image with added per-pixel weights.
+    """
+
+    # get cloud probability image
+    cloud_proba = img.select("cloud_probability")
+
+    # calculate weight from cloud probability
+    weights = ee.image.constant(1.0).subtract(cloud_proba.divide(100))
+
+    return img.addBands(weights.rename("weights"))
 
 if __name__ == "__main__":
     # if called from main, run
