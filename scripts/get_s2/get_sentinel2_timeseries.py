@@ -266,10 +266,15 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         return None
 
     # prepare collection for duplicate removal by appending date
+    logger.info(f"s2 type before duplicate date removal: {type(s2)}")
     s2 = s2.map(prepare_collection_for_duplicate_removal)
     # removal duplicates using the `date` property
-    s2 = s2.distinct("date")
+    s2 = ee.ImageCollection(s2.distinct("date"))
+
+    logger.info(f"s2 type after duplicate date removal: {type(s2)}")
     
+    logger.info(s2.first().getInfo())
+
     # apply QC using "COPERNICUS/S2_CLOUD_PROBABILITY" as Hollstein req. L1C band B10
     s2_cloud_proba_col = (
         ee.ImageCollection("COPERNICUS/S2_CLOUD_PROBABILITY")
@@ -279,7 +284,6 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         .map(lambda image: image.clip(aoi))
         )
     s2_with_cloud_proba = s2.map(lambda image: join_cloud_proba(image, s2_cloud_proba_col))
-
 
     # apply weights based on cloud probability
     s2_with_weights = s2_with_cloud_proba.map(calculate_weights)
