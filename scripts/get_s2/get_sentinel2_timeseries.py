@@ -250,8 +250,6 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
     logger.info(f"Start Date: {start_date}")
     logger.info(f"End Date: {end_date}")
 
-    # TODO Remove duplicate S2s
-
     s2 = (
         ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
         .filterBounds(aoi)
@@ -266,6 +264,11 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
     if s2.size().getInfo() == 0:
         logger.warning("No images found for given query date and AOI")
         return None
+
+    # prepare collection for duplicate removal by appending date
+    s2 = s2.map(prepare_collection_for_duplicate_removal)
+    # removal duplicates using the `date` property
+    s2 = s2.distinct("date")
     
     # apply QC using "COPERNICUS/S2_CLOUD_PROBABILITY" as Hollstein req. L1C band B10
     s2_cloud_proba_col = (
@@ -277,10 +280,41 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         )
     s2_with_cloud_proba = s2.map(lambda image: join_cloud_proba(image, s2_cloud_proba_col))
 
+
     # apply weights based on cloud probability
     s2_with_weights = s2_with_cloud_proba.map(calculate_weights)
 
     return s2_with_weights
+
+def prepare_collection_for_duplicate_removal(img: ee.image) -> ee.image:
+    """
+    Assigns a `date` property to each Sentinel-2 image in an `ee.imagecollection`, for use in excluding duplicates using the built-in function `imagecollection.distinct()`.
+
+    Parameters
+    ----------
+    img : ee.image
+        The Sentinel-2 image to assess
+
+    Returns
+    -------
+    ee.image
+        The Sentinel-2 image with `date` property appended
+    
+    Notes
+    -----
+    This function is used on an ImageCollection via `imagecollection.map(prepare_collection_for_duplicate_removal)`.
+    """
+
+    logger = logging.getLogger(__name__)
+
+    # get system:index to convert to date
+    index = ee.String(img.get("system:index"))
+
+    # convert to date, by slicing the system:index string
+    date = ee.Date(index.slice(0, 8)).format("YYYYMMdd").slice(0, 8) # double slice because .format returns 14 characters, bad hack "solution" I know...
+
+    return img.set("date", date)
+
 
 def convert_dn_to_reflectance(image: ee.Image) -> float:
     """
