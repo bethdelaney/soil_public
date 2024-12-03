@@ -285,10 +285,7 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         )
     s2_with_cloud_proba = s2.map(lambda image: join_cloud_proba(image, s2_cloud_proba_col))
 
-    # apply weights based on cloud probability
-    s2_with_weights = s2_with_cloud_proba.map(calculate_weights)
-
-    return s2_with_weights
+    return s2_with_cloud_proba
 
 def prepare_collection_for_duplicate_removal(img: ee.image) -> ee.image:
     """
@@ -485,29 +482,6 @@ def join_cloud_proba(img: ee.image, cloud_proba_col: ee.ImageCollection) -> ee.i
     cloud_proba_img = ee.Image(cloud_proba_col.filter(ee.Filter.eq("system:index", img.get("system:index"))).first())
     
     return img.addBands(cloud_proba_img.rename("cloud_probability"))
-
-def calculate_weights(img: ee.image) -> ee.image:
-    """
-    Calculate per-pixel weight for Whittaker smoothing based on cloud probability score
-
-    Parameters
-    ----------
-    img : ee.image
-        The image with a cloud probability score to calculate the weights from.
-
-    Returns
-    -------
-    ee.image
-        The image with added per-pixel weights.
-    """
-
-    # get cloud probability image
-    cloud_proba = img.select("cloud_probability")
-
-    # calculate weight from cloud probability
-    weights = ee.image.constant(1.0).subtract(cloud_proba.divide(100))
-
-    return img.addBands(weights.rename("weights"))
 
 if __name__ == "__main__":
     # if called from main, run
