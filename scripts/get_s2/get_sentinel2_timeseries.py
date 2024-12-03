@@ -62,14 +62,14 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
 
     return
 
-def extract_index_timeseries(image_collection: ee.imagecollection, aoi: ee.Geometry.Polygon, out_directory: str) -> None:
+def extract_index_timeseries(image_collection: ee.ImageCollection, aoi: ee.Geometry.Polygon, out_directory: str) -> None:
     """
 
     Converts index values for every image in `image_collection`, converts these to a Pandas DataFrame and writes these to CSV.
 
     Parameters
     ----------
-    image_collection : ee.imagecollection
+    image_collection : ee.ImageCollection
         Sentinel-2 ImageCollection with indices computed.
     aoi : ee.Geometry.Polygon
         GEE compliant geometry.
@@ -224,7 +224,7 @@ def convert_to_ee_geometry(gdf: gpd.GeoDataFrame) -> ee.Geometry.Polygon:
 
     return ee.Geometry.Polygon(polygon_2d_coords)
 
-def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date: str) -> ee.imagecollection:
+def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date: str) -> ee.ImageCollection:
     """
     
     Query the Sentinel-2 Archive with an AOI and date range.
@@ -292,7 +292,7 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
 
 def prepare_collection_for_duplicate_removal(img: ee.image) -> ee.image:
     """
-    Assigns a `date` property to each Sentinel-2 image in an `ee.imagecollection`, for use in excluding duplicates using the built-in function `imagecollection.distinct()`.
+    Assigns a `date` property to each Sentinel-2 image in an `ee.ImageCollection`, for use in excluding duplicates using the built-in function `ImageCollection.distinct()`.
 
     Parameters
     ----------
@@ -306,7 +306,7 @@ def prepare_collection_for_duplicate_removal(img: ee.image) -> ee.image:
     
     Notes
     -----
-    This function is used on an ImageCollection via `imagecollection.map(prepare_collection_for_duplicate_removal)`.
+    This function is used on an ImageCollection via `ImageCollection.map(prepare_collection_for_duplicate_removal)`.
     """
 
     logger = logging.getLogger(__name__)
@@ -460,7 +460,7 @@ def compute_indices(image: ee.Image) -> ee.Image:
 
     return image.addBands(ndvi).addBands(nbr).addBands(ndwi).addBands(savi)
 
-def join_cloud_proba(img: ee.image, cloud_proba_col: ee.imagecollection) -> ee.image:
+def join_cloud_proba(img: ee.image, cloud_proba_col: ee.ImageCollection) -> ee.image:
     """
     Joins a Sentinel-2 image with its corresponding cloud probability mask.    
 
@@ -478,7 +478,7 @@ def join_cloud_proba(img: ee.image, cloud_proba_col: ee.imagecollection) -> ee.i
         
     Notes
     -----
-    This function is used on an ImageCollection via `imagecollection.map(lambda img: join_cloud_proba(img, cloud_prob_col))
+    This function is used on an ImageCollection via `ImageCollection.map(lambda img: join_cloud_proba(img, cloud_prob_col))
     """
 
     # get the cloud probability image that matches `img`
