@@ -1,13 +1,15 @@
 """
 get_sentinel2_timeseries.py
 Authors: Beth Delaney, Matt Payne
-Script to access Sentinel-2 spectral reflectance values by querying GEE servers.
+Script to access Sentinel-2 spectral reflectance values by querying GEE servers, iterating through each polygon sequentially.
 """
 
 from datetime import datetime
 import logging
 import os
 import sys
+import time
+import traceback
 from typing import Optional
 
 import ee
@@ -47,18 +49,33 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     # initialise EE Python API
     initialise(project_name=project_name)
 
-    # convert vector AOI to GEE compliant geometry
-    polygon_ee = convert_to_ee_geometry(gdf=gpd.read_file(aoi_path))
+    # read in shapefile
+    gdf=gpd.read_file(aoi_path)
 
-    # query the S2 Archive
-    s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
+    # iterate over each polygon in the shapefile
+    for index, row in gdf.iterrows():
+        try:
+
+            # convert vector AOI to GEE compliant geometry
+            polygon_ee = convert_to_ee_geometry(gdf=row)
+
+            # query the S2 Archive
+            s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
     
-    # if this argument is passed, then save indices and true colour image as png
-    if out_directory and s2 is not None:
-        save_image_thumbnails(s2.first(), out_directory)
+            # if this argument is passed, then save indices and true colour image as png
+            if out_directory and s2 is not None:
+                save_image_thumbnails(s2.first(), out_directory)
 
-        # get mean index values over time, from the AOI centroid and write to CSV
-        extract_index_timeseries(s2, polygon_ee, out_directory)
+                # get mean index values over time, from the AOI centroid and write to CSV
+                extract_index_timeseries(s2, polygon_ee, out_directory)
+            
+            # add delay to prevent GEE server rate limiting being applied
+            time.sleep(seconds=5)
+                
+        except Exception as e: # should make this more specific when I know the likely exceptions raised
+            # configure traceback
+            error_message = traceback.format_exc()
+            logger.error(f"Could not process polygon {index}: {e} \n {error_message}")
 
     return
 
@@ -211,15 +228,20 @@ def convert_to_ee_geometry(gdf: gpd.GeoDataFrame) -> ee.Geometry.Polygon:
 
     logger = logging.getLogger(__name__)
 
-    polygon_geometry = gdf.geometry[0]
+    polygon_geometry = gdf.geometry
     polygon_geojson = polygon_geometry.__geo_interface__
 
-    
-    # extract 2D coordinates by stripping the third dimension (altitude)
-    polygon_2d_coords = [
-        [(x, y) for x, y, _ in ring] for ring in polygon_geojson['coordinates']
-    ]
-
+    # extract coordinates from the geojson
+    try:
+        polygon_2d_coords = [
+            [(x, y) for x, y in ring] for ring in polygon_geojson['coordinates']
+        ]
+    except ValueError:
+        # if ValueError is raised becsause too many values per vertex are present in the json, strip away altitude (3rd dimension)
+        polygon_2d_coords = [
+                [(x, y) for x, y, _ in ring] for ring in polygon_geojson['coordinates']
+            ]
+        
     logger.info(f"polygon_2d_coords : {polygon_2d_coords}")
 
     return ee.Geometry.Polygon(polygon_2d_coords)
