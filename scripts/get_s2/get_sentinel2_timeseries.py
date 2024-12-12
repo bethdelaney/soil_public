@@ -102,22 +102,20 @@ def extract_index_timeseries(image_collection: ee.ImageCollection, aoi: ee.Geome
     # execute the computation on GEE servers
     sampled_values = reduced_collection.getInfo()["features"]
 
-    # convert the dictionary into a list of dictionaries to use with Pandas
-    data = []
-    for feature in sampled_values:
-        # properties is a dictionary containing the spectral mean values
-        properties = feature["properties"]
-        # convert ms time to an actual date
-        properties["datetime"] = pd.to_datetime(properties["time"], unit="ms")
-        # add to the list
-        data.append(properties)
+    logger.info(f"sampled_values : {sampled_values}")
+
+    # use list comprehension to compactly construct a Pandas DataFrame from a dictionary of `sampled_values`  
+    df = pd.DataFrame([{
+        "feature_id": feature["id"],
+        **feature["properties"]
+    } for feature in sampled_values])
 
     # convert the list of dictionaries to a DataFrame for easier access
-    df = pd.DataFrame(data)
+    df["datetime"] = pd.to_datetime(df["time"], unit="ms")
     df.drop(["time"], axis=1, inplace=True) # drop time in ms
 
     logger.info(df)
-    # TODO "Id" should be retained
+
     df.to_csv(os.path.join(out_directory, "indices_values.csv"), index=False)
 
     return
@@ -148,14 +146,14 @@ def reduce_image_mean(image: ee.image, aoi: ee.Geometry.Polygon) -> ee.dictionar
         bestEffort=True # if too many pixels at scale arg, then try again with coarser scale
     )
 
-    # get tile id
-    tile_id = image.get("MGRS_TILE")
-
     # get the date and time in ms
     reduced_values = reduced_values.set("time", image.get("system:time_start"))
 
     # assign tile_id
-    reduced_values = reduced_values.set("tile_id", tile_id)
+    reduced_values = reduced_values.set("tile_id", image.get("MGRS_TILE"))
+
+    # assign id
+    reduced_values = reduced_values.set("system:index", image.get("system:index"))
 
     # convert from dictonary to ee.Feature. The parent code is `map`, which expects an `ee.Image` or `ee.Feature` to be returned.
     return ee.Feature(None, reduced_values)
