@@ -61,10 +61,10 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
 
     return
 
-def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: str, out_directory: str, thread_lock) -> None:
+def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: str, out_directory: str, csv_lock: threading.Lock, logging_lock: threading.Lock) -> None:
     """
     
-    Process a single polygon, by converting to an GEE geometry, query the S2 GEE archive, extract the spectral data and write to a csv.
+    Process a single polygon, by converting to an GEE geometry, query the S2 GEE archive, extract the spectral data and write to a csv. Now with thread locking!
 
     Parameters
     ----------
@@ -78,6 +78,10 @@ def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: st
         _description_
     out_directory : str
         _description_
+    csv_lock : threading.Lock
+        A filesystem lock to prevent multiple threads writing a CSV at the same time and corruputing the filesystem.
+    logger_lock : threading.Lock
+        A filesystem lock to prevent multiple threads writing to the log at the same time and corruputing the filesystem.
     """
 
     logger = logging.getLogger(__name__)
@@ -87,8 +91,9 @@ def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: st
         # convert vector AOI to GEE compliant geometry
         polygon_ee = convert_to_ee_geometry(gdf=row)
 
-        # query the S2 Archive
-        s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
+        # query the S2 Archive with a thread lock
+        with logging_lock:
+            s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
 
         # get spectral data and write to csv
         if out_directory and s2 is not None:
@@ -101,13 +106,16 @@ def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: st
             # check if sub-dir exists, make if does not
             Path(sub_directory).mkdir(parents=True, exist_ok=True)
             
-            # get mean index values over time, from the AOI centroid and write to CSV
-            extract_index_timeseries(s2, polygon_ee, sub_directory)
+            # get mean index values over time, from the AOI centroid and write to CSV, with a thread lock
+            with csv_lock:
+                extract_index_timeseries(s2, polygon_ee, sub_directory)
         
     except Exception as e: # should make this more specific when I know the likely exceptions raised
         # configure traceback
         error_message = traceback.format_exc()
-        logger.error(f"Could not process polygon {index}: {e} \n {error_message}")
+        # apply thread lock
+        with logging_lock:
+            logger.error(f"Could not process polygon {index}: {e} \n {error_message}")
 
 def extract_index_timeseries(image_collection: ee.ImageCollection, aoi: ee.Geometry.Polygon, out_directory: str) -> None:
     """
