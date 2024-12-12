@@ -64,13 +64,13 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     
             # if this argument is passed, then save indices and true colour image as png
             if out_directory and s2 is not None:
-                save_image_thumbnails(s2.first(), out_directory)
+                # save_image_thumbnails(s2.first(), out_directory)
 
                 # get mean index values over time, from the AOI centroid and write to CSV
                 extract_index_timeseries(s2, polygon_ee, out_directory)
             
             # add delay to prevent GEE server rate limiting being applied
-            time.sleep(seconds=5)
+            time.sleep(5)
                 
         except Exception as e: # should make this more specific when I know the likely exceptions raised
             # configure traceback
@@ -112,11 +112,14 @@ def extract_index_timeseries(image_collection: ee.ImageCollection, aoi: ee.Geome
 
     # convert the list of dictionaries to a DataFrame for easier access
     df["datetime"] = pd.to_datetime(df["time"], unit="ms")
+    # reformat datetime
+    df["datetime"] = df["datetime"].dt.strftime("%Y-%m-%d")
     df.drop(["time"], axis=1, inplace=True) # drop time in ms
 
-    logger.info(df)
-
-    df.to_csv(os.path.join(out_directory, "indices_values.csv"), index=False)
+    # construct date range spectral info csv
+    min_date = df["datetime"].min()
+    max_date = df["datetime"].max()
+    df.to_csv(os.path.join(out_directory, f"{min_date}_{max_date}_indices_values.csv"), index=False)
 
     return
 
@@ -275,7 +278,7 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         .filterBounds(aoi)
         .filterDate(start_date, end_date)
         .sort("system:time_start")
-        .filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 20) \
+        # .filterMetadata('CLOUDY_PIXEL_PERCENTAGE', 'less_than', 20) \
         .map(lambda image: image.clip(aoi))
         .map(compute_indices)
         )
@@ -286,14 +289,9 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
         return None
 
     # prepare collection for duplicate removal by appending date
-    logger.info(f"s2 type before duplicate date removal: {type(s2)}")
     s2 = s2.map(prepare_collection_for_duplicate_removal)
     # removal duplicates using the `date` property
     s2 = ee.ImageCollection(s2.distinct("date"))
-
-    logger.info(f"s2 type after duplicate date removal: {type(s2)}")
-    
-    logger.info(s2.first().getInfo())
 
     # apply QC using "COPERNICUS/S2_CLOUD_PROBABILITY" as Hollstein req. L1C band B10
     s2_cloud_proba_col = (
