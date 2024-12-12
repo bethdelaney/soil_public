@@ -4,10 +4,13 @@ Authors: Beth Delaney, Matt Payne
 Script to access Sentinel-2 spectral reflectance values by querying GEE servers, iterating through each polygon sequentially.
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import logging
 import os
+from pathlib import Path
 import sys
+import threading
 import time
 import traceback
 from typing import Optional
@@ -54,30 +57,57 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
 
     # iterate over each polygon in the shapefile
     for index, row in gdf.iterrows():
-        try:
-
-            # convert vector AOI to GEE compliant geometry
-            polygon_ee = convert_to_ee_geometry(gdf=row)
-
-            # query the S2 Archive
-            s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
-    
-            # if this argument is passed, then save indices and true colour image as png
-            if out_directory and s2 is not None:
-                # save_image_thumbnails(s2.first(), out_directory)
-
-                # get mean index values over time, from the AOI centroid and write to CSV
-                extract_index_timeseries(s2, polygon_ee, out_directory)
-            
-            # add delay to prevent GEE server rate limiting being applied
-            time.sleep(5)
-                
-        except Exception as e: # should make this more specific when I know the likely exceptions raised
-            # configure traceback
-            error_message = traceback.format_exc()
-            logger.error(f"Could not process polygon {index}: {e} \n {error_message}")
+        logger.info("broken for now")
 
     return
+
+def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: str, out_directory: str, thread_lock) -> None:
+    """
+    
+    Process a single polygon, by converting to an GEE geometry, query the S2 GEE archive, extract the spectral data and write to a csv.
+
+    Parameters
+    ----------
+    row : gpd.GeoSeries
+        _description_
+    index : int
+        _description_
+    start_date : str
+        _description_
+    end_date : str
+        _description_
+    out_directory : str
+        _description_
+    """
+
+    logger = logging.getLogger(__name__)
+
+    try:
+
+        # convert vector AOI to GEE compliant geometry
+        polygon_ee = convert_to_ee_geometry(gdf=row)
+
+        # query the S2 Archive
+        s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
+
+        # get spectral data and write to csv
+        if out_directory and s2 is not None:
+            # save_image_thumbnails(s2.first(), out_directory)
+
+            # make sub-directories to store outputs for now
+            # TODO progress to SQL database after parallelism sorted
+            sub_directory=f"{out_directory}/polygon_{index+1}"
+            
+            # check if sub-dir exists, make if does not
+            Path(sub_directory).mkdir(parents=True, exist_ok=True)
+            
+            # get mean index values over time, from the AOI centroid and write to CSV
+            extract_index_timeseries(s2, polygon_ee, sub_directory)
+        
+    except Exception as e: # should make this more specific when I know the likely exceptions raised
+        # configure traceback
+        error_message = traceback.format_exc()
+        logger.error(f"Could not process polygon {index}: {e} \n {error_message}")
 
 def extract_index_timeseries(image_collection: ee.ImageCollection, aoi: ee.Geometry.Polygon, out_directory: str) -> None:
     """
@@ -101,8 +131,6 @@ def extract_index_timeseries(image_collection: ee.ImageCollection, aoi: ee.Geome
 
     # execute the computation on GEE servers
     sampled_values = reduced_collection.getInfo()["features"]
-
-    logger.info(f"sampled_values : {sampled_values}")
 
     # use list comprehension to compactly construct a Pandas DataFrame from a dictionary of `sampled_values`  
     df = pd.DataFrame([{
