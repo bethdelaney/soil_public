@@ -69,15 +69,15 @@ def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: st
     Parameters
     ----------
     row : gpd.GeoSeries
-        _description_
+        the row containing the polygon.
     index : int
-        _description_
+        the index of that row, for file naming numbering.
     start_date : str
-        _description_
+        the start date, in the format "YYYY-MM-DD".
     end_date : str
-        _description_
+        the end date, in the format "YYYY-MM-DD".
     out_directory : str
-        _description_
+        absolute path to the directory to write within, does not need to exist prior.
     csv_lock : threading.Lock
         A filesystem lock to prevent multiple threads writing a CSV at the same time and corruputing the filesystem.
     logger_lock : threading.Lock
