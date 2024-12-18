@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # activate environment with the required libraries
-source /home/mattpayne/miniconda3/etc/profile.d/conda.sh
+source $HOME/miniconda3/etc/profile.d/conda.sh
 conda activate earthengine # too lazy to make another env
 
 # error handling
@@ -20,4 +20,4 @@ mkdir -p "$LOGS_DIR" "$OUT_DIRECTORY"
 
 LOG_PATH="$LOGS_DIR/s2_smoothing.log"
 
-python $HOME/forked/soil_public/scripts/smooth/apply_smoothing.py "$LOG_PATH" "$IN_CSV_PATH" "$OUT_DIRECTORY"
+python $HOME/soil_public/scripts/smooth/apply_smoothing.py "$LOG_PATH" "$IN_CSV_PATH" "$OUT_DIRECTORY"
