@@ -100,6 +100,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
                         logger.error(f"Error in thread : {e}")
                 
             # wait to avoid setting off GEE rate limiting
+            # TODO this sleeps at the end of the request, not useful
             time.sleep(delay)
 
     return
