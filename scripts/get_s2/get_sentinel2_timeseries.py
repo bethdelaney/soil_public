@@ -55,52 +55,52 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     # read in shapefile
     gdf = gpd.read_file(aoi_path)
 
-    # sequential processing
-    [process_polygon(row=row,
-                    index=index,
-                    start_date=start_date,
-                    end_date=end_date,
-                    out_directory=out_directory
-                    ) for index, row in gdf.iterrows()]
-    
-    # batch_size = 1 # the number of simultaneous requests to send to GEE servers
-    # delay = 5 # delay between batches in seconds
-
-    # # create thread locks to prevent filesystem corruption
-    # csv_lock = threading.Lock()
-    # logging_lock = threading.Lock()
-
-    # # it's parallel time, baby!
-    # # iterate over each polygon in the shapefile with list comprehension
-    # with ThreadPoolExecutor() as executor:
-    #     # effectively divide the number of rows in `gdf` into `batch_size`
-    #     for i in range(0, len(gdf), batch_size):
-    #         # get a batch
-    #         batch = gdf[i : i + batch_size]
-    #         # for all rows in the batched gdf, run `process_polygon` for each row
-    #         futures = [
-    #             executor.submit(
-    #                 process_polygon_parallel,
-    #                 row=row,
+    # # sequential processing
+    # [process_polygon(row=row,
     #                 index=index,
     #                 start_date=start_date,
     #                 end_date=end_date,
-    #                 out_directory=out_directory,
-    #                 csv_lock=csv_lock,
-    #                 logging_lock=logging_lock
-    #                 ) 
-    #                 for index, row in batch.iterrows()
-    #                 ]
-    #         # wait until the current batch to finish before moving on
-    #         for future in as_completed(futures):
-    #             try:
-    #                 future.result()
-    #             except Exception as e:
-    #                 with logging_lock:
-    #                     logger.error(f"Error in thread : {e}")
+    #                 out_directory=out_directory
+    #                 ) for index, row in gdf.iterrows()]
+    
+    batch_size = 1 # the number of simultaneous requests to send to GEE servers
+    delay = 5 # delay between batches in seconds
+
+    # create thread locks to prevent filesystem corruption
+    csv_lock = threading.Lock()
+    logging_lock = threading.Lock()
+
+    # it's parallel time, baby!
+    # iterate over each polygon in the shapefile with list comprehension
+    with ThreadPoolExecutor() as executor:
+        # effectively divide the number of rows in `gdf` into `batch_size`
+        for i in range(0, len(gdf), batch_size):
+            # get a batch
+            batch = gdf[i : i + batch_size]
+            # for all rows in the batched gdf, run `process_polygon` for each row
+            futures = [
+                executor.submit(
+                    process_polygon_parallel,
+                    row=row,
+                    index=index,
+                    start_date=start_date,
+                    end_date=end_date,
+                    out_directory=out_directory,
+                    csv_lock=csv_lock,
+                    logging_lock=logging_lock
+                    ) 
+                    for index, row in batch.iterrows()
+                    ]
+            # wait until the current batch to finish before moving on
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    with logging_lock:
+                        logger.error(f"Error in thread : {e}")
                 
-    #         # wait to avoid setting off GEE rate limiting
-    #         time.sleep(delay)
+            # wait to avoid setting off GEE rate limiting
+            time.sleep(delay)
 
     return
 
