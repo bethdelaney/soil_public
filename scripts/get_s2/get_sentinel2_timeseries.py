@@ -54,46 +54,109 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
 
     # read in shapefile
     gdf = gpd.read_file(aoi_path)
-    batch_size = 1 # the number of simultaneous requests to send to GEE servers
-    delay = 5 # delay between batches in seconds
+    # batch_size = 1 # the number of simultaneous requests to send to GEE servers
+    # delay = 5 # delay between batches in seconds
 
     # create thread locks to prevent filesystem corruption
-    csv_lock = threading.Lock()
-    logging_lock = threading.Lock()
+    # csv_lock = threading.Lock()
+    # logging_lock = threading.Lock()
 
     # it's parallel time, baby!
     # iterate over each polygon in the shapefile with list comprehension
-    with ThreadPoolExecutor() as executor:
-        # effectively divide the number of rows in `gdf` into `batch_size`
-        for i in range(0, len(gdf), batch_size):
-            # get a batch
-            batch = gdf[i : i + batch_size]
-            # for all rows in the batched gdf, run `process_polygon` for each row
-            futures = [
-                executor.submit(
-                    process_polygon,
-                    row=row,
-                    index=index,
-                    start_date=start_date,
-                    end_date=end_date,
-                    out_directory=out_directory,
-                    csv_lock=csv_lock,
-                    logging_lock=logging_lock
-                    ) 
-                    for index, row in batch.iterrows()
-                    ]
-            # wait until the current batch to finish before moving on
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    with logging_lock:
-                        logger.error(f"Error in thread : {e}")
+    # with ThreadPoolExecutor() as executor:
+    #     # effectively divide the number of rows in `gdf` into `batch_size`
+    #     for i in range(0, len(gdf), batch_size):
+    #         # get a batch
+    #         batch = gdf[i : i + batch_size]
+    #         # for all rows in the batched gdf, run `process_polygon` for each row
+    #         futures = [
+    #             executor.submit(
+    #                 process_polygon_parallel,
+    #                 row=row,
+    #                 index=index,
+    #                 start_date=start_date,
+    #                 end_date=end_date,
+    #                 out_directory=out_directory,
+    #                 csv_lock=csv_lock,
+    #                 logging_lock=logging_lock
+    #                 ) 
+    #                 for index, row in batch.iterrows()
+    #                 ]
+    #         # wait until the current batch to finish before moving on
+    #         for future in as_completed(futures):
+    #             try:
+    #                 future.result()
+    #             except Exception as e:
+    #                 with logging_lock:
+    #                     logger.error(f"Error in thread : {e}")
                 
-            # wait to avoid setting off GEE rate limiting
-            time.sleep(delay)
+    #         # wait to avoid setting off GEE rate limiting
+    #         time.sleep(delay)
 
     return
+
+def process_polygon_parallel(row: gpd.GeoSeries, index:int, start_date: str, end_date: str, out_directory: str, csv_lock: threading.Lock, logging_lock: threading.Lock) -> None:
+    """
+    
+    Process a single polygon, by converting to an GEE geometry, query the S2 GEE archive, extract the spectral data and write to a csv. Now with thread locking!
+
+    The function itself is not parallel, but is configured in a way to be used with a parallel workflow.
+
+    Parameters
+    ----------
+    row : gpd.GeoSeries
+        the row containing the polygon.
+    index : int
+        the index of that row, for file naming numbering.
+    start_date : str
+        the start date, in the format "YYYY-MM-DD".
+    end_date : str
+        the end date, in the format "YYYY-MM-DD".
+    out_directory : str
+        absolute path to the directory to write within, does not need to exist prior.
+    csv_lock : threading.Lock
+        A filesystem lock to prevent multiple threads writing a CSV at the same time and corruputing the filesystem.
+    logger_lock : threading.Lock
+        A filesystem lock to prevent multiple threads writing to the log at the same time and corruputing the filesystem.
+    """
+
+    logger = logging.getLogger(__name__)
+
+    try:
+
+        # convert vector AOI to GEE compliant geometry
+        polygon_ee = convert_to_ee_geometry(gdf=row)
+
+        # query the S2 Archive with a thread lock
+        with logging_lock:
+            s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
+            logger.info(type(s2))
+            
+        # get spectral data and write to csv
+        if out_directory and s2 is not None:
+            # save_image_thumbnails(s2.first(), out_directory)
+
+            # make sub-directories to store outputs for now
+            # TODO progress to SQL database after parallelism sorted
+            sub_directory=f"{out_directory}/polygon_{index+1}"
+            
+            # check if sub-dir exists, make if does not
+            Path(sub_directory).mkdir(parents=True, exist_ok=True)
+            
+            # get mean index values over time, from the AOI centroid and write to CSV, with a thread lock
+            with csv_lock:
+                extract_index_timeseries(s2, polygon_ee, sub_directory)
+    
+    except ee.EEException as ee_e:
+        with logging_lock:
+            logger.error(f"EEException in polygon {index}: {ee_e} \n {traceback.format_exc()}")
+
+    except Exception as e: # should make this more specific when I know the likely exceptions raised
+        # configure traceback
+        error_message = traceback.format_exc()
+        # apply thread lock
+        with logging_lock:
+            logger.error(f"Could not process polygon {index}: {e} \n {error_message}")
 
 def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: str, out_directory: str, csv_lock: threading.Lock, logging_lock: threading.Lock) -> None:
     """
