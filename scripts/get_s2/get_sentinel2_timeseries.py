@@ -195,7 +195,7 @@ def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: st
 
         # query the S2 Archive
         s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
-        logger.info(type(s2))
+        logger.info(f"s2 archive successfully queried, s2 type is : {type(s2)}")
             
         # get spectral data and write to csv
         if out_directory and s2 is not None:
@@ -241,6 +241,8 @@ def extract_index_timeseries(image_collection: ee.ImageCollection, aoi: ee.Geome
 
     # execute the computation on GEE servers
     sampled_values = reduced_collection.getInfo()["features"]
+
+    logger.info(f"did sending collection reduction to gee servers work?")
 
     # use list comprehension to compactly construct a Pandas DataFrame from a dictionary of `sampled_values`  
     df = pd.DataFrame([{
