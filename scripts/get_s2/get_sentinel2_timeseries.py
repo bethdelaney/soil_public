@@ -348,7 +348,7 @@ def initialise(project_name: str) -> None:
     """
     
     ee.Authenticate()
-    ee.Initialize(project=project_name)
+    ee.Initialize(project=project_name, opt_url="https://earthengine-highvolume.googleapis.com")
 
     return
 
