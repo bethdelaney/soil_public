@@ -63,7 +63,7 @@ def main(project_name: str, aoi_path: str, start_date: str, end_date: str, out_d
     #                 out_directory=out_directory
     #                 ) for index, row in gdf.iterrows()]
     
-    batch_size = 1 # the number of simultaneous requests to send to GEE servers
+    batch_size = 5 # the number of simultaneous requests to send to GEE servers
     delay = 5 # delay between batches in seconds
 
     # create thread locks to prevent filesystem corruption
@@ -140,7 +140,6 @@ def process_polygon_parallel(row: gpd.GeoSeries, index:int, start_date: str, end
         # query the S2 Archive with a thread lock
         with logging_lock:
             s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
-            logger.info(type(s2))
             
         # get spectral data and write to csv
         if out_directory and s2 is not None:
@@ -196,7 +195,7 @@ def process_polygon(row: gpd.GeoSeries, index:int, start_date: str, end_date: st
 
         # query the S2 Archive
         s2 = query_sentinel2_archive(aoi=polygon_ee, start_date=start_date, end_date=end_date)
-        logger.info(f"s2 archive successfully queried, s2 type is : {type(s2)}")
+        # logger.info(f"s2 archive successfully queried, s2 type is : {type(s2)}")
             
         # get spectral data and write to csv
         if out_directory and s2 is not None:
@@ -243,7 +242,7 @@ def extract_index_timeseries(image_collection: ee.ImageCollection, aoi: ee.Geome
     # execute the computation on GEE servers
     sampled_values = reduced_collection.getInfo()["features"]
 
-    logger.info(f"did sending collection reduction to gee servers work?")
+    # logger.info(f"did sending collection reduction to gee servers work?")
 
     # use list comprehension to compactly construct a Pandas DataFrame from a dictionary of `sampled_values`  
     df = pd.DataFrame([{
@@ -384,7 +383,7 @@ def convert_to_ee_geometry(gdf: gpd.GeoDataFrame) -> ee.Geometry.Polygon:
                 [(x, y) for x, y, _ in ring] for ring in polygon_geojson['coordinates']
             ]
         
-    logger.info(f"polygon_2d_coords : {polygon_2d_coords}")
+    # logger.info(f"polygon_2d_coords : {polygon_2d_coords}")
 
     return ee.Geometry.Polygon(polygon_2d_coords)
 
@@ -411,8 +410,8 @@ def query_sentinel2_archive(aoi: ee.Geometry.Polygon, start_date: str, end_date:
 
     logger = logging.getLogger(__name__)
 
-    logger.info(f"Start Date: {start_date}")
-    logger.info(f"End Date: {end_date}")
+    # logger.info(f"Start Date: {start_date}")
+    # logger.info(f"End Date: {end_date}")
 
     s2 = (
         ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
